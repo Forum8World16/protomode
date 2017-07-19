@@ -16,6 +16,7 @@
             }
         </style>
         <title>ProtoMode Web Editor</title>
+        <script src="/socket.io/socket.io.js"></script>
         <script src="/js/three.min.js"></script>
         <script src="/js/controls/DragControls.js"></script>
         <script src="/js/controls/TrackballControls.js"></script>
@@ -23,6 +24,12 @@
     </head>
     <body>
         <script>
+            
+            
+            var systemVariables = {};
+            var modelData = {};
+            var cubeSize = 40;
+            
             var container, stats;
             var camera, controls, scene, renderer;
             var objects = [];
@@ -51,7 +58,6 @@
                 light.shadow.mapSize.width = 2048;
                 light.shadow.mapSize.height = 2048;
                 scene.add( light );
-                var cubeSize = 40;
 
                 //add ground plane
                 var groundGeometry = new THREE.Mesh(
@@ -69,22 +75,22 @@
 
 
                 var geometry = new THREE.BoxGeometry( cubeSize, cubeSize, cubeSize );
-                for ( var i = 0; i < 200; i ++ ) {
-                    var object = new THREE.Mesh( geometry, new THREE.MeshLambertMaterial( { color: Math.random() * 0x00ffff } ) );
-                    object.position.x = Math.round(Math.random() * 10 - 5)*cubeSize;
-                    object.position.y = Math.round(Math.random() * 6 - 3)*cubeSize;
-                    object.position.z = Math.round(Math.random() * 8 - 4)*cubeSize;
-                    //object.rotation.x = Math.random() * 2 * Math.PI;
-                    //object.rotation.y = Math.random() * 2 * Math.PI;
-                    //object.rotation.z = Math.random() * 2 * Math.PI;
-                    //object.scale.x = Math.random() * 2 + 1;
-                    //object.scale.y = Math.random() * 2 + 1;
-                    //object.scale.z = Math.random() * 2 + 1;
-                    object.castShadow = true;
-                    object.receiveShadow = true;
-                    scene.add( object );
-                    objects.push( object );
-                }
+//                for ( var i = 0; i < 200; i ++ ) {
+//                    var object = new THREE.Mesh( geometry, new THREE.MeshLambertMaterial( { color: Math.random() * 0x00ffff } ) );
+//                    object.position.x = Math.round(Math.random() * 10 - 5)*cubeSize;
+//                    object.position.y = Math.round(Math.random() * 6 - 3)*cubeSize;
+//                    object.position.z = Math.round(Math.random() * 8 - 4)*cubeSize;
+//                    //object.rotation.x = Math.random() * 2 * Math.PI;
+//                    //object.rotation.y = Math.random() * 2 * Math.PI;
+//                    //object.rotation.z = Math.random() * 2 * Math.PI;
+//                    //object.scale.x = Math.random() * 2 + 1;
+//                    //object.scale.y = Math.random() * 2 + 1;
+//                    //object.scale.z = Math.random() * 2 + 1;
+//                    object.castShadow = true;
+//                    object.receiveShadow = true;
+//                    scene.add( object );
+//                    objects.push( object );
+//                }
                 renderer = new THREE.WebGLRenderer( { antialias: true } );
                 renderer.setClearColor( 0xf0f0f0 );
                 renderer.setPixelRatio( window.devicePixelRatio );
@@ -95,7 +101,12 @@
                 container.appendChild( renderer.domElement );
                 var dragControls = new THREE.DragControls( objects, camera, renderer.domElement );
                 dragControls.addEventListener( 'dragstart', function ( event ) { controls.enabled = false; } );
-                dragControls.addEventListener( 'dragend', function ( event ) { controls.enabled = true; } );
+                dragControls.addEventListener( 'dragend', function ( event ) { 
+                    console.log(event);
+                    var tempObj = event['object'];
+                    movModel(tempObj.userData,tempObj.position.x,tempObj.position.y,tempObj.position.z);
+                    controls.enabled = true;
+                } );
                 var info = document.createElement( 'div' );
                 info.style.position = 'absolute';
                 info.style.top = '10px';
@@ -123,7 +134,110 @@
                 controls.update();
                 renderer.render( scene, camera );
             }
-
+            
+            
+            
+            var socket = io.connect('/');
+            
+            socket.on('addModel',function(data){
+                addCube(data.modelId,data.x,data.y,data.z)
+            });
+            
+            function addCube(id,ix,iy,iz){
+                console.log('add model');
+                var tempGeom = new THREE.BoxGeometry( cubeSize, cubeSize, cubeSize );
+                var tempObj = new THREE.Mesh( tempGeom, new THREE.MeshLambertMaterial( { color: 0x28726E } ) );
+                tempObj.position.x = ix;
+                tempObj.position.y = iy;
+                tempObj.position.z = iz;
+                tempObj.castShadow = true;
+                tempObj.receiveShadow = true;
+                tempObj.userData = id;
+                scene.add( tempObj );
+                objects.push( tempObj );
+            }
+            
+            socket.on('delModel',function(data){
+                console.log('delete model');
+                var tempObj = scene.getObjectByProperty('userData',data.modelId);
+                objects.remove( tempObj );
+                scene.remove(tempObj);
+            });
+            
+            socket.on('movModel',function(data){
+                console.log('move model');
+                var tempObj = scene.getObjectByProperty('userData',data.modelId);
+                tempObj.position.x = data.x;
+                tempObj.position.y = data.y;
+                tempObj.position.z = data.z;
+            });
+            
+            socket.on('syncSystemVariables',function(data){
+                Object.keys(data).forEach(function(key) {
+                  systemVariables[key] = data[key];
+                });
+            });
+            
+            socket.on('syncModelData',function(data){
+                Object.keys(data).forEach(function(key) {
+                  modelData[key] = data[key];
+                });
+                //TODO: rebuild scene from scratch
+            });
+            
+            function addModel(ix,iy,iz){
+                //create cube at xyz with current id
+                addCube(systemVariables['availableId'],ix,iy,iz);
+                
+                //emit function to add model to synchronize
+                modelData[systemVariables['availableId']]=[ix,iy,iz];
+                socket.emit('addModel',{
+                    'modelId':systemVariables['availableId'],
+                    'x':ix,
+                    'y':iy,
+                    'z':iz
+                });
+                
+                //increment id number available and emit new id number to synchronize
+                systemVariables['availableId'] = systemVariables['availableId']+1;
+                socket.emit('syncSystemVariables',systemVariables);
+            };
+            
+            function delModel(id){
+                //emit command to remove from all clients to synchronize
+                socket.emit('delModel',{
+                    'modelId':id
+                });
+                
+                //delete selected object from scene
+                var tempObj = scene.getObjectByProperty('userData',id);
+                scene.remove(tempObj);
+                
+                //remove id from modelData
+                delete modelData[id];
+            };
+            
+            function movModel(id,ix,iy,iz){
+                
+                //get selected object id
+                var tempObj = scene.getObjectByProperty('userData',id);
+                
+                //move Model
+                //tempObj.position.x = ix;
+                //tempObj.position.x = iy;
+                //tempObj.position.x = iz;
+                
+                //update modelData xyz for object id
+                modelData[id]=[ix,iy,iz];
+                
+                //emit 'movModel' with data
+                socket.emit('movModel',{
+                    'modelId':id,
+                    'x':ix,
+                    'y':iy,
+                    'z':iz
+                });
+            };
         </script>
     </body>
 </html>
