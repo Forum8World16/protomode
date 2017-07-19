@@ -6,33 +6,35 @@ const app = express();
 const server = require('http').createServer(app);
 const io = require('socket.io')(server);
 
+const dgram = require('dgram');
+const udpServer = dgram.createSocket('udp4');
 
 app.use(express.static(__dirname + '/public')); 
-
 
 app.use('/js', express.static(__dirname + '/node_modules/jquery/dist')); // redirect JS jQuery
 app.use('/js', express.static(__dirname + '/node_modules/bootstrap/dist/js')); // redirect bootstrap JS
 app.use('/css', express.static(__dirname + '/node_modules/bootstrap/dist/css')); // redirect CSS bootstrap
 app.use('/js', express.static(__dirname + '/node_modules/three/build')); // redirect three JS
+app.use('/js', express.static(__dirname + '/node_modules/three/examples/js')); // redirect three JS
 
 var port = process.env.PORT || 5000;
 server.listen(port);
 
 var activeDevicesList = [];
 /*
-socket:alsdfjlaskdgj,
+socket:alsdasdflaasdfdgj,
 info:{
-    name:revB,
-    col:3,
-    row:5,
-    bit:12,
-    freq:100,
-    smooth:10,
-    method:max
+    type:webserver
     }
 */
 
 
+udpServer.on('error', (err) =>{
+    console.log('udp server error:/n${err.stack}');
+    console.log('closing the udp server');
+    udpServer.close();
+    //TODO add function to restart the udp server
+});
 
 io.on('connection',function(socket){
     console.log("client "+socket['id']+" connected");
