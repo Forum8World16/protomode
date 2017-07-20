@@ -1,23 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <!-- Use correct character set. -->
-  <meta charset="utf-8">
-  <!-- Tell IE to use the latest, best version. -->
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <!-- Make the application on mobile take up the full browser screen and disable user scaling. -->
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
-  <title>ProtoMode</title>
-</head>
-<body>
-    <h1>Links</h1>
-    <ul>
-        <li><a href="/dashboard">Dashboard</a></li>
-        <li><a href="/webeditor">Web Editor</a></li>
-		<li><a href="/cubecreator">Cube Creator</a></li>
-		<li><a href="/hyve3d">HYVE 3D</a></li>
-        <li><a href="/ucwinroad">uc-Win/Road</a></li>
-        <li><a href="/configuration">Configuration</a></li>
-    </ul>
-</body>
+    <head>
+        <!-- Use correct character set. -->
+        <meta charset="utf-8">
+        <!-- Tell IE to use the latest, best version. -->
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <!-- Make the application on mobile take up the full browser screen and disable user scaling. -->
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+        <title>ProtoMode</title>
+
+        <link rel="stylesheet" href="/css/bootstrap.min.css">
+        <link rel="stylesheet" href="/css/bootstrap-theme.min.css">
+        <script src="/js/jquery.min.js"></script>
+        <script src="/js/bootstrap.min.js"></script>
+    </head>
+    <body>
+        <div class="page-header">
+            <h1>ProtoMode <small>synchronized ui protoptyes for 3d urban scale models</small></h1>
+        </div>
+        <!--        <div class="list-group">-->
+        <ul class="nav nav-pills nav-stacked">
+            <li><button type="button" class="list-group-item" onclick="location.href = '/dashboard';">Dashboard</button></li>
+            <li><button type="button" class="list-group-item" onclick="location.href = '/webeditor';">Web Editor</button></li>
+            <li><button type="button" class="list-group-item" onclick="location.href = '/cubecustomizer';">Cube Customizer</button></li>
+            <li><button type="button" class="list-group-item" onclick="location.href = '/ucwinroad';">UC-win/Road</button></li>
+            <li><button type="button" class="list-group-item" onclick="location.href = '/tangibles';">Tangible Cubes</button></li>
+            <li><button type="button" class="list-group-item" onclick="location.href = '/hyve3d';">HYVE 3D</button></li>
+            <li><button type="button" class="list-group-item" onclick="location.href = '/vive';">VIVE</button></li>
+            <li><button type="button" class="list-group-item" onclick="location.href = '/cardboard';">Cardboard</button></li>
+            <li><button type="button" class="list-group-item" onclick="location.href = '/configuration';">Configuration</button></li>
+            <!--        </div>-->
+        </ul>
+
+    </body>
 </html>
