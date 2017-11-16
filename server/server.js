@@ -1,18 +1,23 @@
 'use strict';
 
+const coreVersion = 1020;
+
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const app = express();
 const server = require('http').createServer(app);
 const io = require('socket.io')(server);
+const md5 = require('md5-file');
+const color = require("rgb");
+const base64js = require('base64-js');
 
 //0,32,99 F8 Blue
 const dgram = require('dgram');
 const udpSocket = dgram.createSocket('udp4');
 var udpPortSend = 50000;
 var udpPortRecv = 50001;
-var udpDestIP = '18.111.83.218';
+var udpDestIP = '192.168.1.199';
 
 app.use(express.static(__dirname + '/public')); 
 
@@ -27,7 +32,7 @@ app.get('/udp', function (req, res) {
 })
 
 process.env.PORT = 80;
-var port = process.env.PORT || 5000;
+var port = process.env.PORT || 80;
 server.listen(port);
 
 var activeDevicesList = [];
@@ -43,6 +48,60 @@ info:{
 
 
 
+
+
+
+
+
+//check github.com/esp8266/Arduino/issues/2228 for example
+app.get('/update/core',function(req,res){
+    //check version somehow
+
+    console.log('a device is requesting an update');
+    console.dir(req.headers);
+    if(parseInt(req.headers['x-esp8266-version'])!=coreVersion){ //could be <
+        var full_path = path.join(__dirname,'/bin/core'+coreVersion+'.bin');
+        fs.readFile(full_path,"binary",function(err,file){
+            if(err){
+                console.log('error uploading new firmware');
+                res.writeHeader(500, {"Content-Type": "text/plain"});
+                res.write(err + "\n");
+                res.end();
+            }
+            else{
+                console.log('uploading new firmware');
+                res.writeHeader(200,
+                                {"Content-Type": "application/octect-stream",
+                                 "Content-Disposition": "attachment;filename="+path.basename(full_path),
+                                 "Content-Length": ""+fs.statSync(full_path)["size"],
+                                 "x-MD5": md5.sync(full_path)});
+                res.write(file, "binary");
+                res.end();
+            }
+        });
+    }
+    else{
+        console.log('not uploading new firmware');
+        res.writeHeader(304, {"Content-Type": "text/plain"});
+        res.write("304 Not Modified\n");
+        res.end();
+    }
+
+});
+
+
+function requestCheckForUpdatesListener(socket){
+    socket.on('requestCheckForUpdates',function(){
+        console.log('received requestCheckForUpdates');
+        io.sockets.emit('checkForUpdate',"");
+    });
+}
+
+function debugListener(socket){
+    socket.on('debug',function(data){
+        console.log(data);
+    });
+}
 
 
 
@@ -87,10 +146,15 @@ var udpData = new Uint8Array(9); //9 bytes in array buffer
 
 function prepareData(commandId,cubeId,ix,iy,iz,is,ir,ig,ib){
 
+    //    ix/=8;
+    //    iy/=8;
+    //    iz/=8;
+    //    is/=8;
+
     var fArr = new Float32Array(4);
     fArr[0] = ix;
-    fArr[1] = iy;
-    fArr[2] = iz;
+    fArr[1] = iz;
+    fArr[2] = -iy;
     fArr[3] = is;
     var bArr = new Int8Array(fArr.buffer);
 
@@ -270,7 +334,7 @@ function syncModelData(socket){
 
 
 var systemVariables = {
-    'availableId':'0'
+    'availableId':0
 };
 
 function syncSystemVariables(socket){
@@ -286,14 +350,40 @@ function syncSystemVariables(socket){
 io.on('connection',function(socket){
     console.log("client "+socket['id']+" connected");
 
-
+    debugListener(socket);
+    
+    setTimeout(function(){
+        socket.emit('checkForUpdate',"");
+    },10000);
 
     socket.on('subscribe',function(roomName){
         socket.join(roomName);
         console.log("client "+socket['id']+" joined room "+roomName);
 
-        if(roomName=='webclients'){
+        if(roomName=='webclient'){
             socket.emit('activeDevicesList',activeDevicesList);
+            requestCheckForUpdatesListener(socket);
+
+            addModelListener(socket);
+            delModelListener(socket);
+            movModelListener(socket);
+
+            syncSystemVariables(socket);
+            socket.emit('syncSystemVariables',systemVariables);
+
+            syncModelData(socket);
+            Object.keys(modelData).forEach(function(key) {
+                socket.emit('addModel',{
+                    'modelId':key,
+                    'x':modelData[key][0],
+                    'y':modelData[key][1],
+                    'z':modelData[key][2],
+                    's':modelData[key][3],
+                    'r':modelData[key][4],
+                    'g':modelData[key][5],
+                    'b':modelData[key][6]
+                });
+            });
         }
     });
 
@@ -301,32 +391,8 @@ io.on('connection',function(socket){
         socket.leave(roomName);
         console.log("client "+socket['id']+" left room "+roomName);
     });
-
-
-
-
-    addModelListener(socket);
-    delModelListener(socket);
-    movModelListener(socket);
-
-    syncSystemVariables(socket);
-    socket.emit('syncSystemVariables',systemVariables);
-
-    syncModelData(socket);
-    Object.keys(modelData).forEach(function(key) {
-        socket.emit('addModel',{
-            'modelId':key,
-            'x':modelData[key][0],
-            'y':modelData[key][1],
-            'z':modelData[key][2],
-            's':modelData[key][3],
-            'r':modelData[key][4],
-            'g':modelData[key][5],
-            'b':modelData[key][6]
-        });
-    });
-
-
+    
+    
     socket.on('register',function(deviceInfo){
         var deviceEntry = {
             'socket':socket['id'],
@@ -358,7 +424,7 @@ io.on('connection',function(socket){
                 sycnDeviceList();
             }
         });
-        console.log("client "+socket+" disconnected");
+        console.log("client "+socket['id']+" disconnected");
     });
 });
 
@@ -403,6 +469,8 @@ function test0(){
         //        );
         //io.sockets.emit('addModel',tempData);
         udpSendModelData();
+        systemVariables.availableId = 20;
+
     };
     console.log(modelData);
 };
@@ -420,6 +488,7 @@ function test1(){
             modelData[keys[i]] = [tArr[0],tArr[1],tArr[2],tArr[3],tArr[4],tArr[5],tArr[6]];
         }
         udpSendModelData();
+        systemVariables.availableId = keys.length;
     });
 
     console.log("\n *DONE LOADING* \n");

@@ -82,7 +82,7 @@
             function init() {
                 container = document.createElement( 'div' );
                 document.body.appendChild( container );
-                camera = new THREE.PerspectiveCamera( 70, window.innerWidth / window.innerHeight, 1, 1000 );
+                camera = new THREE.PerspectiveCamera( 70, window.innerWidth / window.innerHeight, 1, 2000 );
                 camera.position.x = 30;
                 camera.position.y = 100;
                 camera.position.z = -30;
@@ -112,28 +112,30 @@
 
                 scene = new THREE.Scene();
                 scene.add( new THREE.AmbientLight( 0x505050 ) );
-//                var light = new THREE.SpotLight( 0xffffff, 1.5 );
-//                light.position.set( 200, 2000, -500 );
-//                light.castShadow = true;
-//                light.shadow = new THREE.LightShadow( new THREE.PerspectiveCamera( 200, 2000, -500, 100000 ) );
-//
-//                light.shadow.bias = - 0.00022;
-//                light.shadow.mapSize.width = 2048;
-//                light.shadow.mapSize.height = 2048;
+                var light = new THREE.SpotLight( 0xffffff, 1.5 );
+                light.position.set( 80, 200, -50 );
+                //light.shadowCameraVisible  = true;
+                light.castShadow = true;
+                //light.shadow = new THREE.LightShadow( new THREE.PerspectiveCamera( -20, 100, 30, 1000 ) );
+
+                light.shadow.bias = - 0.00001;
+                light.shadow.mapSize.width = 2048;
+                light.shadow.mapSize.height = 2048;
 
 
                 //Create a DirectionalLight and turn on shadows for the light
-                var light = new THREE.DirectionalLight( 0xffffff, 1.5, 10000 );
-                light.position.set( -200, 1000, 300 ); 			//default; light shining from top
-                light.castShadow = true;            // default false
+                //                var light = new THREE.DirectionalLight( 0xffffff, 1.5, 10000 );
+                //                light.position.set( -200, 1000, 300 ); 			//default; light shining from top
+                //                light.castShadow = true;            // default false
+                //                light.shadowCameraVisible  = true;
 
                 //Set up shadow properties for the light
-                light.shadow.mapSize.width = 2048;  // default
-                light.shadow.mapSize.height = 2048; // default
-                light.shadow.camera.near = 0.5;       // default
-                light.shadow.camera.far = 5000      // default
-                
-                
+                //                light.shadow.mapSize.width = 2048;  // default
+                //                light.shadow.mapSize.height = 2048; // default
+                //                light.shadow.camera.near = 0.5;       // default
+                //                light.shadow.camera.far = 5000      // default
+
+
                 scene.add( light );
 
                 //add ground plane
@@ -215,6 +217,7 @@
                 //
                 document.addEventListener( 'mousemove', onDocumentMouseMove, false );
                 window.addEventListener( 'resize', onWindowResize, false );
+                window.addEventListener('keyup', handleKeyUp, false);
             }
             function onWindowResize() {
                 camera.aspect = window.innerWidth / window.innerHeight;
@@ -231,6 +234,28 @@
                 render();
                 //stats.update();
             }
+            function handleKeyUp(event) {
+                if (event.keyCode === 68) { //d
+                    //delete
+                    raycaster.setFromCamera( mouse, camera );
+                    var intersects = raycaster.intersectObjects( objects );
+                    if ( intersects.length > 0 ) {
+                        delModel(intersects[ 0 ].object.userData);
+                    }
+                }
+                if (event.keyCode === 65) { //a
+                    //add
+                    raycaster.setFromCamera( mouse, camera );
+                    var intersects = raycaster.intersectObjects( scene.children);
+                    if ( intersects.length > 0 ) {
+                        addModel(snap(intersects[ 0 ].point.x),snap(-intersects[ 0 ].point.z),snap(intersects[ 0 ].point.y));
+                    }
+                }
+                if (event.keyCode === 67) { //c
+                    //change color
+                }
+            }
+
             function render() {
                 controls.update();
 
@@ -255,7 +280,10 @@
 
 
             var socket = io.connect('/');
-
+            
+            socket.on('connect',function(){
+               socket.emit('subscribe',"webclients"); 
+            });
             socket.on('addModel',function(data){
                 addCube(data.modelId,data.x,data.y,data.z,data.s,data.r,data.g,data.b);
             });
@@ -316,15 +344,19 @@
             //TODO: use somehow
             function addModel(ix,iy,iz){
                 //create cube at xyz with current id
-                addCube(systemVariables['availableId'],ix,iy,iz);
+                addCube(systemVariables['availableId'],ix,iy,iz,4,0,32,99);
 
                 //emit function to add model to synchronize
-                modelData[systemVariables['availableId']]=[ix,iy,iz];
+                modelData[systemVariables['availableId']]=[ix,iy,iz,4,0,32,99];
                 socket.emit('addModel',{
                     'modelId':systemVariables['availableId'],
                     'x':ix,
                     'y':iy,
-                    'z':iz
+                    'z':iz,
+                    's':4,
+                    'r':0,
+                    'g':32,
+                    'b':99
                 });
 
                 //increment id number available and emit new id number to synchronize
